@@ -41,7 +41,11 @@ except ImportError:  # .env не обязателен, можно задать �
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0") or 0)
-CHANNEL_URL = os.getenv("CHANNEL_URL", "https://t.me/uralride")
+# BOT_MODE=ural (по умолчанию) или BOT_MODE=aquabank: один код, два разных бота
+BOT_MODE = os.getenv("BOT_MODE", "ural").strip().lower()
+CHANNEL_URL = os.getenv(
+    "CHANNEL_URL", "https://t.me/aquabank2" if BOT_MODE == "aquabank" else "https://t.me/uralride"
+)
 LEADS_FILE = Path(os.getenv("LEADS_FILE", "leads.csv"))
 
 # ======================================================================
@@ -50,7 +54,7 @@ LEADS_FILE = Path(os.getenv("LEADS_FILE", "leads.csv"))
 
 WELCOME = (
     "Ну че!? Здарооова! 🤙\n"
-    "Добро пожаловать в <b>Урал Райд</b> и <b>Аквабанк</b>!\n\n"
+    "Добро пожаловать в <b>Урал Райд</b>!\n\n"
     "Выбирай раздел, и мой помощник ответит тебе на все вопросы. "
     "А если есть вопрос ко мне, жми «Лично» или просто пиши «Лично»."
 )
@@ -64,24 +68,157 @@ SURF_PRICE = 55000  # сноусерф
 
 # Цена икры за 1 кг в рублях по видам. Пока цены не утверждены, оставьте None:
 # бот не называет цену и просто собирает заявки. Когда утвердите, впишите числа, например 15000.
-CAVIAR_PRICES = {"Кета": None, "Горбуша": None}
-CAVIAR_PRICE_UNTIL = "конца ноября"  # до какой даты зафиксирована цена (когда цены заданы)
+CAVIAR_PRICES = {"Горбуша": 18000, "Кета": 20000}
+CAVIAR_PRICE_UNTIL = "конца октября"  # до какой даты зафиксирована цена (когда цены заданы)
+
+
+CAVIAR_PACK_KG = {"250 г": 0.25, "500 г": 0.5, "1 кг": 1.0}
+
+
+def _fmt_rub(value: float) -> str:
+    return f"{round(value):,}".replace(",", " ") + " ₽"
 
 
 def _caviar_price_line() -> str:
     known = {k: v for k, v in CAVIAR_PRICES.items() if v}
     if not known:
         return "Цены на текущий период сейчас формируем. Оставь заявку, и Дмитрий пришлет цену, как только она будет утверждена."
-    parts = ", ".join(f"{k}: {v:,}".replace(",", " ") + " ₽/кг" for k, v in known.items())
-    return f"Цена зафиксирована до {CAVIAR_PRICE_UNTIL}: {parts}."
+    lines = []
+    for kind, price in known.items():
+        parts = " · ".join(f"{pack} {_fmt_rub(price * kg)}" for pack, kg in CAVIAR_PACK_KG.items())
+        lines.append(f"{kind}: {parts}")
+    lines.append("Больше 1 кг: специальная цена, обсудим лично.")
+    lines.append(f"Цена действует до {CAVIAR_PRICE_UNTIL}, партия ограничена. Дальше ожидается подорожание на 15–30%.")
+    return "\n".join(lines)
+
 
 # Вес фасовок в кг. «Больше 1 кг» бот не считает, цену вы обсуждаете лично.
-CAVIAR_PACK_KG = {"250 г": 0.25, "500 г": 0.5, "1 кг": 1.0}
+
+# TJ Brand: доски в наличии. Правьте здесь: цену, наличие (in_stock), описание и фото.
+# photo: ссылка на фото или Telegram file_id (необязательно). Если пусто, бот шлет только текст.
+TJ_STOCK = [
+    {
+        "name": "Smooth Groove",
+        "size": "150 см",
+        "price": 57000,
+        "in_stock": True,
+        "desc": "",
+        "photo": "",
+    },
+    {
+        "name": "Origin",
+        "size": "158 см",
+        "price": 68000,
+        "in_stock": True,
+        "desc": "",
+        "photo": "",
+    },
+    {
+        "name": "SHIFT BASIC CAMBER",
+        "size": "156 см",
+        "price": 71000,
+        "in_stock": True,
+        "desc": "",
+        "photo": "",
+    },
+    {
+        "name": "Cruiser",
+        "size": "156 см",
+        "price": 74000,
+        "in_stock": True,
+        "desc": (
+            "Универсальная доска для фрирайда и all-mountain. "
+            "Сердечник Power Arch Carbon Mix (X-wood, тополь, бамбук, вертикальная арка из карбона), "
+            "боковины ABS, графитовая основа, стекло Mighty Glass 2. "
+            "Ширина носа, талии и хвоста 294, 248 и 287 мм, радиус 8,0–9,2 м, "
+            "смещение стойки 20 мм, диапазон стойки 480–600 мм. "
+            "Линейка модели: 149,5, 156, 157 и 160 см."
+        ),
+        "photo": "",
+    },
+    {
+        "name": "Flying-V A.B.M",
+        "size": "160 см",
+        "price": 74000,
+        "in_stock": True,
+        "desc": "",
+        "photo": "",
+    },
+    {
+        "name": "Origin THE DAY",
+        "size": "159 см",
+        "price": 74000,
+        "in_stock": True,
+        "desc": "",
+        "photo": "",
+    },
+    {
+        "name": "Draft P.A.C",
+        "size": "",
+        "price": 77000,
+        "in_stock": False,  # у магазина Planka нет в наличии: включите True, если доска у вас есть
+        "desc": (
+            "Отзывчивая модель для скорости и точной езды. "
+            "Сердечник Power Arch Carbon (X-wood, тополь, бамбук, вертикальная арка из карбона), "
+            "боковины ABS, основа P-Tex 4000 с графитом, триаксиальное стекло. "
+            "Ширина носа, талии и хвоста 315, 262 и 295 мм, радиус 6,2 м, "
+            "смещение стойки 50 мм, диапазон стойки 500–580 мм."
+        ),
+        "photo": "",
+    },
+]
+
+
+# Номера карточек на сайте planka-store.com, откуда берутся ваши фото.
+# Бот пробует сначала крупное фото, затем уменьшенное из каталога.
+_PLANKA_PHOTO_IDS = {
+    "Smooth Groove": 2430,
+    "Origin": 2428,
+    "SHIFT BASIC CAMBER": 2425,
+    "Cruiser": 2426,
+    "Flying-V A.B.M": 2424,
+    "Origin THE DAY": 2429,
+    "Draft P.A.C": 2427,
+}
+for _m in TJ_STOCK:
+    _pid = _PLANKA_PHOTO_IDS.get(_m["name"])
+    if _pid and not _m["photo"]:
+        _m["photo"] = [
+            f"https://planka-store.com/img/scif1_orig/spr_noms/2/{_pid}.jpg",
+            f"https://planka-store.com/img/scif1/spr_noms/2/{_pid}.jpg",
+        ]
+
+
+def _tj_title(m: dict) -> str:
+    return f"{m['name']} {m['size']}".strip()
+
+
+def _tj_list_text() -> str:
+    items = [m for m in TJ_STOCK if m["in_stock"]]
+    if not items:
+        return "Сейчас по TJ Brand нет досок в наличии. Дмитрий расскажет, что можно заказать."
+    lines = [f"• {_tj_title(m)}: {_fmt_rub(m['price'])}" for m in items]
+    return "🇯🇵 <b>TJ Brand, в наличии</b>\n" + "\n".join(lines)
+
+
+def _tj_card(name: str) -> tuple[str, list]:
+    """Текст карточки модели и список ссылок на фото (может быть пустым)."""
+    for m in TJ_STOCK:
+        if m["name"] == name:
+            text = f"<b>TJ Brand {_tj_title(m)}</b>\nЦена: <b>{_fmt_rub(m['price'])}</b>."
+            if m["desc"]:
+                text += "\n" + m["desc"]
+            else:
+                text += "\nПодробности и фото пришлет Дмитрий."
+            photos = m.get("photo") or []
+            return text, [photos] if isinstance(photos, str) else list(photos)
+    return "Дмитрий подберет модель по твоему росту и весу.", []
+
 
 # История бренда. Здесь только то, что точно известно. Дополните своими фактами.
 STORY = (
     "📖 <b>История Урал Райд</b>\n\n"
-    "Меня зовут Дмитрий Белов, я основатель Урал Райд и Аквабанк. Профессионально я занимался "
+    "Меня зовут Дмитрий Белов, я основатель Урал Райд. Профессионально я занимался "
     "волейболом, а в 2014 году встал на сноуборд на Белой горе в Свердловской области и с тех пор "
     "не расстаюсь с ним ни одного сезона.\n\n"
     "В 2016 году я впервые приехал в Шерегеш, и бесконечный лесной фрирайд решил всё: мне нужна "
@@ -94,8 +231,7 @@ STORY = (
     "Сегодня я эксклюзивный дистрибьютор TJ Brand и сам произвожу доски для фрирайда по обновленной "
     "технологии. Ты можешь заказать доску из Японии или нашего производства, и в обоих случаях "
     "это будет правильный выбор.\n\n"
-    "Рядом живут костровые системы Урал Райд (более 20 комплектов уже по всей России) и Аквабанк: "
-    "красная икра и деликатесы, за качество которых мы отвечаем уже больше 6 лет."
+    "Рядом живут костровые системы Урал Райд: больше 20 комплектов уже по всей России."
 )
 
 # Подробные описания (кнопка «Подробнее о товаре»)
@@ -163,7 +299,6 @@ DESCRIPTIONS = {
         "🐟 <b>Красная икра, Аквабанк</b>\n\n"
         "<b>Виды:</b> кета и горбуша. Поставки из Сахалина напрямую с рыбного завода.\n"
         f"<b>Цена:</b> {_caviar_price_line()}\n"
-        "<b>Фасовки:</b> 250 г, 500 г, 1 кг. Больше 1 кг: цену обсуждаем лично.\n"
         "<b>Упаковка:</b> герметичная, вакуумная. <b>Срок хранения:</b> до месяца в холодильнике.\n"
         "<b>Где:</b> самовывоз и доставка только по Екатеринбургу.\n"
         "<b>Как проходит:</b> набираем заказы примерно две недели на куб икры (12,5 кг), открываем свежий куб "
@@ -183,7 +318,6 @@ CAVIAR_INTRO = (
     "🐟 <b>Красная икра, Аквабанк</b>\n"
     "Кета и горбуша, поставки из Сахалина напрямую с рыбного завода.\n"
     f"{_caviar_price_line()}\n"
-    "Фасовки: 250 г, 500 г, 1 кг. Больше 1 кг обсуждаем лично. "
     "Упаковка герметичная, вакуумная, хранится до месяца в холодильнике.\n"
     "Набираем заказы примерно две недели на куб икры (12,5 кг), открываем "
     "свежий куб и в тот же или на следующий день развозим. "
@@ -198,12 +332,13 @@ DELICACY_INTRO = (
 )
 
 DESCRIPTIONS["board"] += "\n\n" + DESCRIPTIONS.pop("surf")
+DESCRIPTIONS["board"] += "\n\n<b>TJ Brand</b>\n" + _tj_list_text()
 DESCRIPTIONS["caviar"] += "\n\n" + DELICACY_INTRO
 
 # Пост для канала: кнопки ведут в бота сразу в нужное направление
 CHANNEL_POST = (
     "Ну че!? Здарооова! 🤙\n"
-    "Добро пожаловать в <b>Урал Райд</b> и <b>Аквабанк</b>!\n\n"
+    "Добро пожаловать в <b>Урал Райд</b>!\n\n"
     "Выбирай раздел, и мой помощник ответит тебе на все вопросы. "
     "А если есть вопрос ко мне, пиши «Лично»."
 )
@@ -263,7 +398,8 @@ DIRECTIONS = {
             "Здесь всё про доски:\n"
             "• <b>Фрирайд «Свобода»</b> (наше производство): 65 000 ₽, срок 2–3 недели, сейчас предзаказ. "
             "Шпон из предложенных и базовая настройка жесткости бесплатно.\n"
-            "• <b>TJ Brand</b> (Япония): мы эксклюзивный дистрибьютор. Цену и наличие называем лично.\n"
+            "• <b>TJ Brand</b> (Япония): мы эксклюзивный дистрибьютор. Доски в наличии и под заказ, "
+            f"в наличии от {_fmt_rub(min((m['price'] for m in TJ_STOCK if m['in_stock']), default=0))}.\n"
             "• <b>Сноусерфы</b> (наше производство): 55 000 ₽, срок 2–3 недели, сейчас предзаказ.\n"
             "Выбирай, что интересует."
         ),
@@ -273,6 +409,19 @@ DIRECTIONS = {
                 "label": "Что интересует",
                 "q": "Что именно тебя интересует?",
                 "options": ["Фрирайд «Свобода»", "TJ Brand (Япония)", "Сноусерф", "Подскажи"],
+            },
+            {
+                "key": "tj_model",
+                "label": "Модель TJ Brand",
+                "q": "Что выбираешь?",
+                "options": [m["name"] for m in TJ_STOCK if m["in_stock"]] + ["Под заказ", "Подскажи"],
+                "only_if": ("line", "TJ"),
+            },
+            {
+                "key": "tj_wish",
+                "label": "TJ Brand под заказ",
+                "q": "Напиши, какая модель и размер тебя интересуют, или опиши, что ищешь.",
+                "only_if": ("tj_model", "Под заказ"),
             },
             {
                 "key": "height",
@@ -391,6 +540,45 @@ DIRECTIONS = {
     },
 }
 
+# Подписи кнопок в закреплённом посте канала (порядок: сноуборды, мангалы, икра)
+CHANNEL_BUTTONS = [
+    ("board", "🏂 Сноуборды"),
+    ("fire", "🔥 Костровые системы"),
+    ("caviar", "🐟 Красная икра и деликатесы"),
+]
+
+BOT_LABEL = "Урал Райд"
+
+if BOT_MODE == "aquabank":
+    BOT_LABEL = "Аквабанк"
+    DIRECTIONS = {"caviar": DIRECTIONS["caviar"]}
+    WELCOME = (
+        "Здарова! 🤙\n"
+        "Это <b>Аквабанк</b>: красная икра с Сахалина и дальневосточные деликатесы.\n\n"
+        "Выбирай раздел, и мой помощник ответит тебе на все вопросы. "
+        "А если есть вопрос ко мне, жми «Лично» или просто пиши «Лично»."
+    )
+    STORY = (
+        "📖 <b>История Аквабанка</b>\n\n"
+        "Всё началось, когда я работал в IT. Мой друг-волейболист временно переехал во Владивосток "
+        "и присылал мне фото и видео с рыночных прилавков: деликатесы по очень интересным ценам. "
+        "Мы созванивались очень рано или очень поздно из-за разницы во времени, а он периодически "
+        "отправлял мне настоящие вкусности: кукумарию, морских ежей, красную икру, крабов, гребешки.\n\n"
+        "Я влюбился в эти продукты и показал знакомым, что цены могут быть доступнее магазинных, "
+        "а товар свежее. Был период, когда у нас был свой магазин, сейчас мы полностью онлайн. "
+        "Икра приходит с Сахалина напрямую с рыбного завода.\n\n"
+        "<b>Аквабанк за качество отвечает!</b> Это наш девиз с Игорем: мы дружим больше 20 лет, "
+        "и все, кто нас знает, это подтвердят."
+    )
+    CHANNEL_POST = (
+        "Здарова! 🤙 Это <b>Аквабанк</b>.\n\n"
+        "Красная икра с Сахалина и деликатесы под заказ. Нажми на кнопку: бот ответит на все вопросы, "
+        "посчитает цену и оформит предзаказ. А если вопрос ко мне, пиши «Лично»."
+    )
+
+else:
+    DIRECTIONS = {k: v for k, v in DIRECTIONS.items() if k != "caviar"}
+
 # ======================================================================
 # Код бота. Обычно ниже ничего менять не нужно.
 # ======================================================================
@@ -462,8 +650,15 @@ def price_summary(direction: str, answers: dict):
         )
     line = answers.get("line", "")
     if "TJ" in line:
+        model = next((m for m in TJ_STOCK if m["name"] == answers.get("tj_model")), None)
+        if model:
+            return (
+                f"Предварительная стоимость: <b>{_fmt_rub(model['price'])}</b>. "
+                "Дмитрий подтвердит наличие и подберет размер под твой рост и вес.",
+                f"TJ Brand {_tj_title(model)}: {_fmt_rub(model['price'])}",
+            )
         return (
-            "Цену и наличие досок TJ Brand лично уточнит Дмитрий и подберет варианты под твой рост и вес.",
+            "Цену, наличие и размер Дмитрий уточнит лично и подберет вариант под твой рост и вес.",
             "TJ Brand: цена и наличие уточняются",
         )
     is_surf = "Сноусерф" in line
@@ -604,7 +799,7 @@ async def finish(message: Message, user, state: FSMContext, bot: Bot):
         )
 
     # 2. уведомление вам
-    lines = [f"🆕 <b>Новая заявка:</b> {escape(DIRECTIONS[direction]['title'])}"]
+    lines = [f"🆕 <b>Новая заявка ({BOT_LABEL}):</b> {escape(DIRECTIONS[direction]['title'])}"]
     if source:
         lines.append(f"Источник: {escape(source)}")
     lines.append(f"Клиент: {user_label(user)}")
@@ -647,14 +842,22 @@ async def record_and_advance(message: Message, user, state: FSMContext, bot: Bot
             qty = int(digits)
             value = str(qty)
             price = CAVIAR_PRICES.get(answers.get("kind", ""))
-            result = calc_caviar(pack, qty, price)
-            if result:
-                total, kg = result
-                kg_text = f"{kg:g}".replace(".", ",")
+            kg = CAVIAR_PACK_KG[pack] * qty
+            kg_text = f"{kg:g}".replace(".", ",")
+            if price:
+                total = kg * price
                 answers["total"] = f"{rub(total)} ({kg_text} кг по {rub(price)}/кг)"
                 await message.answer(
                     f"Предварительная сумма: <b>{rub(total)}</b> за {kg_text} кг.\n"
-                    f"Цена зафиксирована до {CAVIAR_PRICE_UNTIL}. Детали уточнит владелец."
+                    f"Цена действует до {CAVIAR_PRICE_UNTIL}, дальше ожидается подорожание на 15–30%. "
+                    "Детали уточнит владелец."
+                )
+            elif any(CAVIAR_PRICES.values()):
+                sums = [f"{k}: {rub(kg * v)}" for k, v in CAVIAR_PRICES.items() if v]
+                answers["total"] = f"вид не выбран ({kg_text} кг): " + ", ".join(sums)
+                await message.answer(
+                    f"Предварительная сумма за {kg_text} кг:\n" + "\n".join(sums)
+                    + f"\nЦена действует до {CAVIAR_PRICE_UNTIL}. Подскажем, какую икру выбрать."
                 )
             else:
                 answers["total"] = "цена на текущий период формируется, сообщить клиенту"
@@ -664,10 +867,34 @@ async def record_and_advance(message: Message, user, state: FSMContext, bot: Bot
                 )
         else:
             answers["total"] = "объем больше 1 кг, цена обсуждается лично"
+            await message.answer("Для объема больше 1 кг цена специальная, Дмитрий назовет ее лично.")
 
     answers[key] = value
     if direction == "caviar" and key == "section":
         await message.answer(DELICACY_INTRO if "Деликатесы" in value else CAVIAR_INTRO)
+    if direction == "board" and key == "line" and "TJ" in value:
+        await message.answer(_tj_list_text())
+    if direction == "board" and key == "tj_model" and value == "Под заказ":
+        await message.answer(
+            "Доски TJ Brand под заказ: каталог сейчас готовим. "
+            "Напиши, что тебе нужно, и Дмитрий вернется с вариантами и сроками."
+        )
+    elif direction == "board" and key == "tj_model":
+        card_text, card_photos = _tj_card(value)
+        sent = False
+        for url in card_photos:
+            try:
+                if len(card_text) <= 1000:
+                    await message.answer_photo(url, caption=card_text)
+                else:
+                    await message.answer_photo(url)
+                    await message.answer(card_text)
+                sent = True
+                break
+            except Exception:
+                logging.exception("Не удалось отправить фото модели: %s", url)
+        if not sent:
+            await message.answer(card_text)
     n_dir = len(DIRECTIONS[direction]["steps"])
     nxt = idx + 1
     while nxt < len(steps) and not step_active(steps[nxt], answers):
@@ -686,7 +913,7 @@ async def record_and_advance(message: Message, user, state: FSMContext, bot: Bot
 
 async def request_human(message: Message, user, state: FSMContext, bot: Bot):
     data = await state.get_data()
-    text = f"💬 <b>Клиент просит написать лично</b>\n{user_label(user)}"
+    text = f"💬 <b>Клиент просит написать лично ({BOT_LABEL})</b>\n{user_label(user)}"
     if data.get("direction"):
         text += f"\nНаправление: {escape(DIRECTIONS[data['direction']]['title'])}"
         for s in steps_for(data["direction"]):
@@ -747,9 +974,9 @@ def build_dispatcher() -> Dispatcher:
         me = await bot.get_me()
         base = f"https://t.me/{me.username}?start=kanal_"
         kb = InlineKeyboardBuilder()
-        kb.button(text="🏂 Сноуборды", url=base + "board")
-        kb.button(text="🔥 Костровые системы", url=base + "fire")
-        kb.button(text="🐟 Красная икра и деликатесы", url=base + "caviar")
+        for key, label in CHANNEL_BUTTONS:
+            if key in DIRECTIONS:
+                kb.button(text=label, url=base + key)
         kb.adjust(1)
         try:
             sent = await bot.send_message(chat, CHANNEL_POST, reply_markup=kb.as_markup())
