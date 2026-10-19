@@ -14,6 +14,7 @@
 
 import asyncio
 import csv
+import json
 import logging
 import os
 import re
@@ -21,6 +22,7 @@ from datetime import datetime
 from html import escape
 from pathlib import Path
 
+import aiohttp
 from aiogram import Bot, Dispatcher, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -47,6 +49,9 @@ CHANNEL_URL = os.getenv(
     "CHANNEL_URL", "https://t.me/aquabank2" if BOT_MODE == "aquabank" else "https://t.me/uralride"
 )
 LEADS_FILE = Path(os.getenv("LEADS_FILE", "leads.csv"))
+# Запись заявок в Google-таблицу через веб-приложение Apps Script (необязательно).
+SHEETS_WEBHOOK_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
+SHEETS_WEBHOOK_SECRET = os.getenv("SHEETS_WEBHOOK_SECRET", "")
 
 # ======================================================================
 # НАСТРОЙКИ: тексты, цены, вопросы
@@ -59,18 +64,13 @@ WELCOME = (
     "А если есть вопрос ко мне, жми «Связаться с Дмитрием»."
 )
 
-# Цена и дата предзаказа икры: меняйте здесь, когда откроете новый период
-# Цены (в рублях). Меняйте здесь.
 FIRE_PRICES = {"Таганай 32 см": 5500, "Конжак 40 см": 7500}  # сталь Ст3
 FIRE_STAINLESS_EXTRA = 2000  # доплата за нержавеющую сталь
 BOARD_PRICE = 65000  # сноуборд «Свобода»
 SURF_PRICE = 55000  # сноусерф
 
-# Цена икры за 1 кг в рублях по видам. Пока цены не утверждены, оставьте None:
-# бот не называет цену и просто собирает заявки. Когда утвердите, впишите числа, например 15000.
 CAVIAR_PRICES = {"Горбуша": 18000, "Кета": 20000}
-CAVIAR_PRICE_UNTIL = "конца октября"  # до какой даты зафиксирована цена (когда цены заданы)
-
+CAVIAR_PRICE_UNTIL = "конца октября"
 
 CAVIAR_PACK_KG = {"250 г": 0.25, "500 г": 0.5, "1 кг": 1.0}
 
@@ -96,10 +96,6 @@ def _caviar_price_line() -> str:
     return text
 
 
-# Вес фасовок в кг. «Больше 1 кг» бот не считает, цену вы обсуждаете лично.
-
-# TJ Brand: доски в наличии. Правьте здесь: цену, наличие (in_stock), описание и фото.
-# photo: ссылка на фото или Telegram file_id (необязательно). Если пусто, бот шлет только текст.
 TJ_STOCK = [
     {
         "name": "Smooth Groove",
@@ -170,7 +166,7 @@ TJ_STOCK = [
         "name": "Draft P.A.C",
         "size": "",
         "price": 77000,
-        "in_stock": False,  # у магазина Planka нет в наличии: включите True, если доска у вас есть
+        "in_stock": False,
         "desc": (
             "Отзывчивая модель для скорости и точной езды. "
             "Сердечник Power Arch Carbon (X-wood, тополь, бамбук, вертикальная арка из карбона), "
@@ -182,9 +178,6 @@ TJ_STOCK = [
     },
 ]
 
-
-# Номера карточек на сайте planka-store.com, откуда берутся ваши фото.
-# Бот пробует сначала крупное фото, затем уменьшенное из каталога.
 _PLANKA_PHOTO_IDS = {
     "Smooth Groove": 2430,
     "Origin": 2428,
@@ -216,7 +209,6 @@ def _tj_list_text() -> str:
 
 
 def _tj_card(name: str) -> tuple[str, list]:
-    """Текст карточки модели и список ссылок на фото (может быть пустым)."""
     for m in TJ_STOCK:
         if m["name"] == name:
             text = f"<b>TJ Brand {_tj_title(m)}</b>\nЦена: <b>{_fmt_rub(m['price'])}</b>."
@@ -229,7 +221,6 @@ def _tj_card(name: str) -> tuple[str, list]:
     return "Дмитрий подберет модель по твоему росту и весу.", []
 
 
-# История бренда. Здесь только то, что точно известно. Дополните своими фактами.
 STORY = (
     "📖 <b>История Урал Райд</b>\n\n"
     "Меня зовут Дмитрий Белов, я основатель Урал Райд. Профессионально я занимался "
@@ -248,7 +239,6 @@ STORY = (
     "Рядом живут костровые системы Урал Райд: больше 20 комплектов уже по всей России."
 )
 
-# Подробные описания (кнопка «Подробнее о товаре»)
 DESCRIPTIONS = {
     "fire": (
         "🔥 <b>Костровые системы Урал Райд</b>\n\n"
@@ -347,7 +337,6 @@ DESCRIPTIONS["board"] += "\n\n" + DESCRIPTIONS.pop("surf")
 DESCRIPTIONS["board"] += "\n\n<b>TJ Brand</b>\n" + _tj_list_text()
 DESCRIPTIONS["caviar"] += "\n\n" + DELICACY_INTRO
 
-# Пост для канала: кнопки ведут в бота сразу в нужное направление
 CHANNEL_POST = (
     "Ну че!? Здарооова! 🤙\n"
     "Добро пожаловать в <b>Урал Райд</b>!\n\n"
@@ -355,8 +344,6 @@ CHANNEL_POST = (
     "А если есть вопрос ко мне, жми «Связаться с Дмитрием»."
 )
 
-
-# Вопросы, которые бот задает в конце для любого направления
 CONTACT_STEPS = [
     {"key": "name", "label": "Имя", "q": "Как к тебе обращаться?"},
     {
@@ -372,8 +359,6 @@ CONTACT_STEPS = [
     },
 ]
 
-# Направления: у каждого есть вступление и список вопросов.
-# Вопрос с "options" показывается кнопками, без "options" ждет текст.
 DIRECTIONS = {
     "fire": {
         "title": "🔥 Мангалы, костровые чаши",
@@ -552,7 +537,6 @@ DIRECTIONS = {
     },
 }
 
-# Подписи кнопок в закреплённом посте канала (порядок: сноуборды, мангалы, икра)
 CHANNEL_BUTTONS = [
     ("board", "🏂 Сноуборды"),
     ("fire", "🔥 Костровые системы"),
@@ -594,11 +578,7 @@ if BOT_MODE == "aquabank":
 else:
     DIRECTIONS = {k: v for k, v in DIRECTIONS.items() if k != "caviar"}
 
-# ======================================================================
-# Код бота. Обычно ниже ничего менять не нужно.
-# ======================================================================
-
-HUMAN_MODE: set[int] = set()  # клиенты, которым вы ответите лично (до перезапуска бота)
+HUMAN_MODE: set[int] = set()
 
 
 class Flow(StatesGroup):
@@ -610,7 +590,6 @@ def rub(value: float) -> str:
 
 
 def calc_caviar(pack: str, qty: int, price_per_kg: int | None):
-    """Возвращает (сумма в рублях, всего кг) или None, если считать нельзя."""
     kg_each = CAVIAR_PACK_KG.get(pack)
     if kg_each is None or qty <= 0 or not price_per_kg:
         return None
@@ -619,12 +598,11 @@ def calc_caviar(pack: str, qty: int, price_per_kg: int | None):
 
 
 def suggest_size(height_text: str) -> str:
-    """Подсказка размера доски «Свобода» по росту. Пустая строка, если рост не распознан."""
     match = re.search(r"\d+[.,]?\d*", height_text or "")
     if not match:
         return ""
     h = float(match.group().replace(",", "."))
-    if 1.4 <= h <= 2.5:  # рост указан в метрах
+    if 1.4 <= h <= 2.5:
         h *= 100
     if h < 160 or h > 200:
         return "рост вне диапазона 160–200 см, подберем лично"
@@ -640,7 +618,6 @@ def suggest_size(height_text: str) -> str:
 
 
 def price_summary(direction: str, answers: dict):
-    """Возвращает (сообщение клиенту, строка суммы для заявки)."""
     if direction == "fire":
         base = FIRE_PRICES.get(answers.get("model"))
         steel = answers.get("material", "")
@@ -708,7 +685,6 @@ def _conds(value):
 
 
 def step_active(step: dict, answers: dict) -> bool:
-    """Нужно ли задавать этот вопрос с учетом уже полученных ответов."""
     for key, text in _conds(step.get("skip_if")):
         if text in answers.get(key, ""):
             return False
@@ -719,7 +695,6 @@ def step_active(step: dict, answers: dict) -> bool:
 
 
 def parse_start(payload: str):
-    """'instagram' -> ('instagram', None); 'kanal_board' -> ('kanal', 'board')."""
     payload = (payload or "").strip()
     if "_" in payload:
         src, d = payload.rsplit("_", 1)
@@ -762,6 +737,24 @@ def question_kb(step: dict):
     return kb.as_markup()
 
 
+async def push_lead_to_sheet(row: list):
+    """Отправляет заявку в Google-таблицу. Ошибка не мешает работе бота: файл leads.csv остаётся резервом."""
+    if not SHEETS_WEBHOOK_URL:
+        return
+    try:
+        timeout = aiohttp.ClientTimeout(total=15)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                SHEETS_WEBHOOK_URL,
+                data=json.dumps({"secret": SHEETS_WEBHOOK_SECRET, "row": row}, ensure_ascii=False),
+                headers={"Content-Type": "text/plain; charset=utf-8"},
+            ) as resp:
+                if resp.status >= 400:
+                    logging.warning("Таблица ответила статусом %s", resp.status)
+    except Exception:
+        logging.exception("Не удалось записать заявку в Google-таблицу")
+
+
 def user_label(user) -> str:
     name = escape(user.full_name or "без имени")
     link = f'<a href="tg://user?id={user.id}">{name}</a>'
@@ -795,7 +788,6 @@ async def finish(message: Message, user, state: FSMContext, bot: Bot):
     source = data.get("source", "")
     steps = steps_for(direction)
 
-    # 1. запись в таблицу leads.csv (открывается в Excel и Google Таблицах)
     new_file = not LEADS_FILE.exists()
     with LEADS_FILE.open("a", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f, delimiter=";")
@@ -813,7 +805,19 @@ async def finish(message: Message, user, state: FSMContext, bot: Bot):
             ]
         )
 
-    # 2. уведомление вам
+    await push_lead_to_sheet(
+        [
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            BOT_LABEL,
+            DIRECTIONS[direction]["title"],
+            source,
+            str(user.id),
+            user.username or "",
+            " | ".join(f"{s['label']}: {answers[s['key']]}" for s in steps if s["key"] in answers)
+            + (f" | Сумма: {answers['total']}" if answers.get("total") else ""),
+        ]
+    )
+
     lines = [f"🆕 <b>Новая заявка ({BOT_LABEL}):</b> {escape(DIRECTIONS[direction]['title'])}"]
     if source:
         lines.append(f"Источник: {escape(source)}")
@@ -826,7 +830,6 @@ async def finish(message: Message, user, state: FSMContext, bot: Bot):
         lines.append(f"<b>💰 Сумма:</b> {escape(answers['total'])}")
     await notify_admin(bot, "\n".join(lines))
 
-    # 3. ответ клиенту
     kb = InlineKeyboardBuilder()
     kb.button(text="📣 Перейти в канал", url=CHANNEL_URL)
     kb.button(text="↩️ В начало", callback_data="menu")
@@ -957,8 +960,6 @@ def build_dispatcher() -> Dispatcher:
 
     @dp.message(CommandStart())
     async def start(message: Message, state: FSMContext):
-        # ссылка вида t.me/ИМЯ_БОТА?start=instagram запишет источник заявки
-        # ссылка t.me/ИМЯ_БОТА?start=kanal_board сразу открывает нужное направление
         parts = (message.text or "").split(maxsplit=1)
         source, direction = parse_start(parts[1] if len(parts) > 1 else "")
         HUMAN_MODE.discard(message.from_user.id)
@@ -1013,8 +1014,6 @@ def build_dispatcher() -> Dispatcher:
 
     @dp.chat_join_request()
     async def on_join_request(request: ChatJoinRequest, bot: Bot):
-        # Работает, если вступление в канал идет по заявкам (ссылка-приглашение с одобрением).
-        # Бот пишет человеку сразу, пока заявка не обработана, и запоминает источник.
         try:
             state = FSMContext(
                 storage=dp.storage,
