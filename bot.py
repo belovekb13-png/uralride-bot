@@ -31,7 +31,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import CallbackQuery, ChatJoinRequest, FSInputFile, InlineKeyboardButton, Message
+from aiogram.types import (CallbackQuery, ChatJoinRequest, FSInputFile, InlineKeyboardButton, InputMediaPhoto,
+                           Message)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 try:
@@ -278,9 +279,6 @@ DESCRIPTIONS = {
         "• <b>162</b> (рост 180–200 см): длина 1620 мм, 320/262/295 мм, радиус 7,0 м, рабочий кант 1130 мм, "
         "вес около 2,52 кг, гибкость очень жесткая.\n"
         "Вес райдера учитываем индивидуально: жесткость настраиваем под каждого. Гибкость и вес доски расчетные (модельная оценка). Прогиб 4–5 мм, подъем носа и хвоста 70–75 и 26–30 мм.\n\n"
-        "<b>Сборка (сверху вниз):</b> шпон 0,6 мм, карбоновый UD-стрингер 0° на всю длину, трехосное стекло 700 г/м², "
-        "осиновый сердечник переменной толщины, трехосное стекло 700 г/м², демпфирующая резина VDS 0,2 мм, "
-        "PTEX-основа со стальными кантами.\n\n"
         "<b>Что можно выбрать:</b>\n"
         "• ростовку под твой рост;\n"
         "• жесткость под вес райдера (дополнительные стрингеры и стекловолокно), базовая настройка бесплатно;\n"
@@ -333,6 +331,9 @@ DELICACY_INTRO = (
     "Ответь на пару вопросов, чтобы мы поняли, что заказывать."
 )
 
+DESC_BOARD = DESCRIPTIONS["board"]
+DESC_SURF = DESCRIPTIONS["surf"]
+DESC_FIRE = DESCRIPTIONS["fire"]
 DESCRIPTIONS["board"] += "\n\n" + DESCRIPTIONS.pop("surf")
 DESCRIPTIONS["board"] += "\n\n<b>TJ Brand</b>\n" + _tj_list_text()
 DESCRIPTIONS["caviar"] += "\n\n" + DELICACY_INTRO
@@ -539,6 +540,7 @@ DIRECTIONS = {
 
 CHANNEL_BUTTONS = [
     ("board", "🏂 Сноуборды"),
+    ("surf", "🏄 СноуСёрф"),
     ("fire", "🔥 Костровые системы"),
     ("caviar", "🐟 Красная икра и деликатесы"),
 ]
@@ -577,6 +579,199 @@ if BOT_MODE == "aquabank":
 
 else:
     DIRECTIONS = {k: v for k, v in DIRECTIONS.items() if k != "caviar"}
+
+# ======================================================================
+# НАВИГАЦИЯ: разделы, статьи, материалы
+# ======================================================================
+# Файлы (PDF, рендеры, фото) кладите в папку materials/ рядом с bot.py.
+# Если файла нет, бот просто пропускает его и показывает текст.
+MATERIALS_DIR = Path(__file__).resolve().parent / "materials"
+
+# --- Урал Райд ---------------------------------------------------------
+SECTIONS_URAL = {
+    "board": {
+        "title": "🏂 Сноуборды",
+        "pdf": "presentation_boards.pdf",
+        "lead": "board",
+        "lead_label": "✍️ Сделать заявку",
+        "text": (
+            "🏂 <b>Сноуборды Урал Райд</b>\n"
+            "Делаем фрирайд-доски серии «Свобода» руками в своей мастерской в Екатеринбурге. "
+            "Мастер, с которым мы работаем, делает спортивные доски с 2016 года, больше 20 досок за сезон.\n\n"
+            "Наша философия: <b>натуральность</b>. Живое дерево, настоящий шпон.\n"
+            "Ростовки 152 / 156 / 162, цена <b>65 000 ₽</b>, предзаказ 2–3 недели.\n\n"
+            "📄 В презентации: контур и характеристики каждой ростовки, как подобрать."
+        ),
+    },
+    "surf": {
+        "title": "🏄 СноуСёрф",
+        "pdf": "presentation_surf.pdf",
+        "lead": "surf",
+        "lead_label": "✍️ Сделать заявку",
+        "text": (
+            "🏄 <b>Свобода СноуСёрф 148</b>\n"
+            "Доска для глубокого снега без креплений. Делаем руками в мастерской Урал Райд, "
+            "настоящий шпон, три цвета: тёмно-красный, тёмно-синий, тёмно-зелёный.\n\n"
+            "Цена <b>55 000 ₽</b>, пять досок к 1 ноября, бронь: предоплата 30%.\n\n"
+            "📄 В презентации: размеры, как устроен, как придумывался."
+        ),
+    },
+    "fire": {
+        "title": "🔥 Костровые системы",
+        "pdf": "presentation_fire.pdf",
+        "lead": "fire",
+        "lead_label": "✍️ Сделать заявку",
+        "text": (
+            "🔥 <b>Костровые системы Урал Райд</b>\n"
+            "Таганай 32 см и Конжак 40 см: мангал из трёх стенок с двумя уровнями жара и мульти-решёткой. "
+            "Идея пришла из Америки, мы доработали её у себя в Екатеринбурге. Больше 20 комплектов уже по России.\n\n"
+            "Таганай <b>5 500 ₽</b>, Конжак <b>7 500 ₽</b> (сталь Ст3), нержавейка +2 000 ₽.\n\n"
+            "📄 В презентации: размеры, комплект, как мы их придумали."
+        ),
+    },
+    "tj": {
+        "title": "🇯🇵 TJ Brand",
+        "pdf": None,
+        "lead": "tj",
+        "lead_label": "✍️ Сделать заявку",
+        "text": (
+            "🇯🇵 <b>TJ Brand из Японии</b>\n"
+            "Мы эксклюзивный дистрибьютор японского бренда. Почти все доски для фрирайда.\n\n"
+            + _tj_list_text()
+            + "\n\nЦену и наличие под твой рост и вес называем лично."
+        ),
+    },
+    "history": {
+        "title": "📖 История",
+        "pdf": "presentation_history.pdf",
+        "lead": None,
+        "lead_label": "",
+        "text": (
+            "📖 <b>История Урал Райд</b>\n"
+            "Кто мы, как начинали, наши доски прошлых лет и живые фото. "
+            "Сейчас у нас новая философия: <b>натуральность</b>."
+        ),
+    },
+}
+
+if BOT_MODE != "aquabank":
+    DIRECTIONS["board"] = {
+        "title": "🏂 Сноуборды",
+        "intro": "✍️ <b>Заявка на сноуборд</b>\nОдин вопрос про тебя и твой контакт, и Дмитрий свяжется лично.",
+        "steps": [
+            {
+                "key": "wish",
+                "label": "Рост, вес, уровень, какая доска",
+                "q": "Напиши одним сообщением: рост, вес, уровень катания и какая доска тебе понравилась. "
+                     "Если не знаешь, так и напиши, подберём.",
+            },
+        ],
+    }
+    DIRECTIONS["surf"] = {
+        "title": "🏄 СноуСёрф",
+        "intro": "✍️ <b>Заявка на СноуСёрф</b>\nВыбери цвет, напиши рост и вес, и Дмитрий свяжется лично.",
+        "steps": [
+            {
+                "key": "s_color",
+                "label": "Цвет шпона",
+                "q": "Какой цвет нравится?",
+                "options": ["Тёмно-красный", "Тёмно-синий", "Тёмно-зелёный", "Пока не решил"],
+            },
+            {"key": "s_hw", "label": "Рост и вес", "q": "Напиши рост и вес одним сообщением."},
+        ],
+    }
+    DIRECTIONS["tj"] = {
+        "title": "🇯🇵 TJ Brand",
+        "intro": "✍️ <b>Заявка на TJ Brand</b>\nОпиши, что ищешь, и Дмитрий вернётся с вариантами.",
+        "steps": [
+            {
+                "key": "tj_wish",
+                "label": "Что интересует",
+                "q": "Напиши, какая модель и размер интересуют, плюс рост и вес. Или просто «подскажи».",
+            },
+        ],
+    }
+    DIRECTIONS["fire"]["title"] = "🔥 Костровые системы"
+    DIRECTIONS["fire"]["steps"] = DIRECTIONS["fire"]["steps"][:2]
+    DIRECTIONS["fire"]["intro"] = "✍️ <b>Заявка на костровую систему</b>\nВыбери модель и сталь, и Дмитрий свяжется лично."
+    CONTACT_STEPS[:] = [
+        {
+            "key": "contact",
+            "label": "Контакт",
+            "q": "Оставь телефон или ник, куда написать (и город, если нужна доставка).",
+        },
+    ]
+
+# --- Аквабанк ----------------------------------------------------------
+SECTIONS_AQUA = {
+    "caviar": {
+        "title": "🐟 Красная икра",
+        "intro": "",
+        "lead": "caviar",
+        "lead_label": "✍️ Оформить предзаказ",
+        "items": [
+            {
+                "title": "💰 Почему так дорого?",
+                "text": (
+                    "💰 <b>Почему так дорого?</b>\n\n"
+                    "Потому что мы знаем про эту икру всё:\n"
+                    "• она идет с завода на Сахалине, с одного и того же. Мы работаем с ним уже "
+                    "6 лет (в прошлом сезоне был юбилейный, пятый);\n"
+                    "• на икру есть сертификаты, мы точно знаем, откуда она приехала;\n"
+                    "• она приезжает к нам охлажденной;\n"
+                    "• мы работаем по предзаказу: цена фиксируется до даты, и ты знаешь, что получишь.\n\n"
+                    "И еще: красная икра за все эти годы только дорожала. Актуальные цены в разделе "
+                    "«Кета и горбуша»."
+                ),
+                "files": ["certificates.jpg"],
+            },
+            {
+                "title": "🔎 А можно найти дешевле?",
+                "text": (
+                    "🔎 <b>А можно найти дешевле?</b>\n\n"
+                    "Можно, дешевле икра бывает. Мы не будем говорить, что у других плохо. Просто "
+                    "сравнивай по четырем вещам:\n"
+                    "1. Откуда она: завод, производитель, что написано на банке.\n"
+                    "2. Есть ли документы и сертификаты.\n"
+                    "3. В каком виде приехала: охлажденная или после заморозки.\n"
+                    "4. Когда произведена и как хранилась по дороге.\n\n"
+                    "Если на всё это есть честный ответ и цена ниже, бери. Если ответа нет, "
+                    "экономия получается именно за счет этого. У нас на каждый пункт ответ есть, "
+                    "могу показать сертификаты."
+                ),
+                "files": [],
+            },
+            {
+                "title": "🐟 Кета и горбуша: что выбрать",
+                "text": (
+                    "🐟 <b>Кета и горбуша</b>\n\n"
+                    "<b>Кета:</b> икринка крупнее, сочная, более нежный вкус.\n"
+                    "<b>Горбуша:</b> икринка мельче, ярко-красная, вкус насыщеннее, с легкой горчинкой.\n\n"
+                    "Обе с Сахалина, с одного завода. Выбирай по вкусу, а если сомневаешься, можно "
+                    "взять по небольшой упаковке и сравнить.\n\n"
+                    + _caviar_price_line()
+                ),
+                "files": ["guide_caviar.pdf", "photo_caviar_1.jpg", "photo_caviar_2.jpg", "photo_caviar_3.jpg"],
+            },
+            {
+                "title": "📦 Как проходит предзаказ",
+                "text": (
+                    "📦 <b>Как проходит предзаказ</b>\n\n"
+                    "Мы набираем заказы примерно две недели на куб икры (12,5 кг). Когда набирается "
+                    "достаточно заказов, открываем свежий куб и в тот же или на следующий день "
+                    "развозим заказчикам. Есть самовывоз.\n\n"
+                    "Упаковка вакуумная и герметичная, в холодильнике хранится до месяца. "
+                    "Самовывоз и доставка только по Екатеринбургу.\n\n"
+                    "Чтобы оформить предзаказ, нажми кнопку ниже."
+                ),
+                "files": [],
+            },
+        ],
+    },
+}
+
+SECTIONS = SECTIONS_AQUA if BOT_MODE == "aquabank" else SECTIONS_URAL
+
 
 HUMAN_MODE: set[int] = set()
 
@@ -631,14 +826,29 @@ def price_summary(direction: str, answers: dict):
         if steel == "Нержавеющая сталь":
             total = base + FIRE_STAINLESS_EXTRA
             text = f"Предварительная стоимость: <b>{rub(total)}</b> (нержавеющая сталь)."
-            return text + " Комплектация и доставка: см. описание выше, доставка за счет покупателя.", rub(total)
+            return text + " Комплектация и доставка описаны в презентации, доставка за счет покупателя.", rub(total)
         if steel == "Ст3":
             text = f"Предварительная стоимость: <b>{rub(base)}</b> (сталь Ст3)."
-            return text + " Комплектация и доставка: см. описание выше, доставка за счет покупателя.", rub(base)
+            return text + " Комплектация и доставка описаны в презентации, доставка за счет покупателя.", rub(base)
         return (
             f"Стоимость: <b>{rub(base)}</b> в стали Ст3 и "
             f"<b>{rub(base + FIRE_STAINLESS_EXTRA)}</b> в нержавеющей. Подскажем, что лучше для твоих задач.",
             f"{rub(base)} (Ст3) или {rub(base + FIRE_STAINLESS_EXTRA)} (нержавейка), сталь не выбрана",
+        )
+    if direction == "tj":
+        return (
+            "Цену, наличие и размер Дмитрий уточнит лично и подберет вариант под твой рост и вес.",
+            "TJ Brand: цена и наличие уточняются",
+        )
+    if direction == "board":
+        return (
+            f"Предварительная стоимость: <b>{rub(BOARD_PRICE)}</b>. Ростовку, жесткость и шпон подберем под тебя вместе.",
+            rub(BOARD_PRICE),
+        )
+    if direction == "surf":
+        return (
+            f"Предварительная стоимость: <b>{rub(SURF_PRICE)}</b>. Бронь: предоплата 30%.",
+            rub(SURF_PRICE),
         )
     line = answers.get("line", "")
     if "TJ" in line:
@@ -653,7 +863,7 @@ def price_summary(direction: str, answers: dict):
             "Цену, наличие и размер Дмитрий уточнит лично и подберет вариант под твой рост и вес.",
             "TJ Brand: цена и наличие уточняются",
         )
-    is_surf = "Сноусерф" in line
+    is_surf = "Сноусерф" in line or direction == "surf"
     price = SURF_PRICE if is_surf else BOARD_PRICE
     custom = answers.get("s_veneer" if is_surf else "veneer") in ("Свой вариант", "Другой")
     text = f"Предварительная стоимость: <b>{rub(price)}</b>. Выбор шпона из предложенных бесплатно."
@@ -698,8 +908,6 @@ def parse_start(payload: str):
     payload = (payload or "").strip()
     if "_" in payload:
         src, d = payload.rsplit("_", 1)
-        if d == "surf":
-            d = "board"
         if d in DIRECTIONS:
             return src, d
     return payload, None
@@ -715,13 +923,110 @@ def channel_chat() -> str:
 
 def main_menu():
     kb = InlineKeyboardBuilder()
-    for key, d in DIRECTIONS.items():
-        kb.button(text=d["title"], callback_data=f"dir:{key}")
-    kb.button(text="📖 Наша история", callback_data="story")
+    if BOT_MODE == "aquabank":
+        sec = SECTIONS["caviar"]
+        for i, it in enumerate(sec["items"]):
+            kb.button(text=it["title"], callback_data=f"itm:caviar:{i}")
+        kb.button(text=sec["lead_label"], callback_data="dir:caviar")
+    else:
+        for key, sec in SECTIONS.items():
+            kb.button(text=sec["title"], callback_data=f"sec:{key}")
+    if BOT_MODE == "aquabank":
+        kb.button(text="📖 Наша история", callback_data="story")
     kb.button(text=HUMAN_BUTTON, callback_data="human")
     kb.button(text="📣 Наш канал", url=CHANNEL_URL)
     kb.adjust(1)
     return kb.as_markup()
+
+
+def section_kb(key: str):
+    sec = SECTIONS[key]
+    kb = InlineKeyboardBuilder()
+    if "items" in sec:  # Аквабанк: подменю с материалами
+        for i, it in enumerate(sec["items"]):
+            kb.button(text=it["title"], callback_data=f"itm:{key}:{i}")
+    if sec.get("lead"):
+        kb.button(text=sec["lead_label"], callback_data=f"dir:{sec['lead']}")
+    kb.button(text=HUMAN_BUTTON, callback_data="human")
+    kb.button(text="◀️ Назад" if "items" not in sec else "↩️ В начало", callback_data="menu")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def item_kb(key: str):
+    kb = InlineKeyboardBuilder()
+    back = "menu" if BOT_MODE == "aquabank" else f"sec:{key}"
+    kb.button(text="◀️ Назад", callback_data=back)
+    kb.button(text=HUMAN_BUTTON, callback_data="human")
+    kb.adjust(2)
+    return kb.as_markup()
+
+
+async def send_long(message: Message, text: str, reply_markup=None):
+    """Telegram не принимает сообщения длиннее 4096 символов: режем по строкам."""
+    while len(text) > 3900:
+        cut = text.rfind("\n", 0, 3900)
+        cut = cut if cut > 0 else 3900
+        await message.answer(text[:cut])
+        text = text[cut:].lstrip("\n")
+    await message.answer(text, reply_markup=reply_markup)
+
+
+IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp")
+
+
+async def send_materials(message: Message, files: list):
+    """files: имена файлов из materials/ или пары (имя, подпись). Подряд идущие картинки уходят альбомом."""
+    items = []
+    for f in files:
+        name, caption = (f, None) if isinstance(f, str) else f
+        path = MATERIALS_DIR / name
+        if not path.exists():
+            logging.info("Нет файла материала: %s", path)
+            continue
+        items.append((path, caption))
+    i = 0
+    while i < len(items):
+        path, caption = items[i]
+        try:
+            if path.suffix.lower() in IMAGE_EXT:
+                j = i
+                while j < len(items) and items[j][0].suffix.lower() in IMAGE_EXT and j - i < 10:
+                    j += 1
+                group = items[i:j]
+                if len(group) == 1:
+                    await message.answer_photo(FSInputFile(path), caption=caption)
+                else:
+                    media = [InputMediaPhoto(media=FSInputFile(p), caption=c) for p, c in group]
+                    await message.answer_media_group(media)
+                i = j
+                continue
+            await message.answer_document(FSInputFile(path), caption=caption)
+        except Exception:
+            logging.exception("Не удалось отправить материал %s", path.name)
+        i += 1
+
+
+async def reset_keep_source(state: FSMContext):
+    data = await state.get_data()
+    await state.clear()
+    await state.update_data(source=data.get("source", ""))
+
+
+async def show_section(message: Message, key: str):
+    sec = SECTIONS[key]
+    if "items" in sec:
+        await message.answer(sec["intro"], reply_markup=section_kb(key))
+        return
+    kb = section_kb(key)
+    pdf = MATERIALS_DIR / sec["pdf"] if sec.get("pdf") else None
+    if pdf and pdf.exists():
+        try:
+            await message.answer_document(FSInputFile(pdf), caption=sec["text"], reply_markup=kb)
+            return
+        except Exception:
+            logging.exception("Не удалось отправить презентацию %s", pdf.name)
+    await message.answer(sec["text"], reply_markup=kb)
 
 
 def question_kb(step: dict):
@@ -917,7 +1222,7 @@ async def record_and_advance(message: Message, user, state: FSMContext, bot: Bot
     nxt = idx + 1
     while nxt < len(steps) and not step_active(steps[nxt], answers):
         nxt += 1
-    if direction in ("fire", "board") and idx < n_dir <= nxt:
+    if direction in ("fire", "board", "surf", "tj") and idx < n_dir <= nxt:
         note, total_text = price_summary(direction, answers)
         answers["total"] = total_text
         await message.answer(note)
@@ -949,9 +1254,12 @@ async def begin_direction(message: Message, state: FSMContext, user_id: int, dir
     HUMAN_MODE.discard(user_id)
     await state.update_data(direction=direction, idx=0, answers={})
     await state.set_state(Flow.answering)
-    info_kb = InlineKeyboardBuilder()
-    info_kb.button(text="ℹ️ Подробнее о товаре", callback_data=f"info:{direction}")
-    await message.answer(DIRECTIONS[direction]["intro"], reply_markup=info_kb.as_markup())
+    if BOT_MODE == "aquabank":
+        info_kb = InlineKeyboardBuilder()
+        info_kb.button(text="ℹ️ Подробнее о товаре", callback_data=f"info:{direction}")
+        await message.answer(DIRECTIONS[direction]["intro"], reply_markup=info_kb.as_markup())
+    else:
+        await message.answer(DIRECTIONS[direction]["intro"])
     await send_question(message, direction, 0)
 
 
@@ -965,8 +1273,8 @@ def build_dispatcher() -> Dispatcher:
         HUMAN_MODE.discard(message.from_user.id)
         await state.clear()
         await state.update_data(source=source)
-        if direction:
-            await begin_direction(message, state, message.from_user.id, direction)
+        if direction and direction in SECTIONS and BOT_MODE != "aquabank":
+            await show_section(message, direction)
         else:
             await message.answer(WELCOME, reply_markup=main_menu())
 
@@ -1039,6 +1347,29 @@ def build_dispatcher() -> Dispatcher:
         await state.clear()
         await state.update_data(source=data.get("source", ""))
         await call.message.answer(WELCOME, reply_markup=main_menu())
+
+    @dp.callback_query(F.data.startswith("sec:"))
+    async def open_section(call: CallbackQuery, state: FSMContext):
+        await call.answer()
+        key = call.data.split(":", 1)[1]
+        if key not in SECTIONS:
+            return
+        HUMAN_MODE.discard(call.from_user.id)
+        await reset_keep_source(state)
+        await show_section(call.message, key)
+
+    @dp.callback_query(F.data.startswith("itm:"))
+    async def open_item(call: CallbackQuery, state: FSMContext):
+        await call.answer()
+        try:
+            _, key, idx = call.data.split(":")
+            item = SECTIONS[key]["items"][int(idx)]
+        except (ValueError, KeyError, IndexError):
+            return
+        HUMAN_MODE.discard(call.from_user.id)
+        await reset_keep_source(state)
+        await send_materials(call.message, item.get("files", []))
+        await send_long(call.message, item["text"], reply_markup=item_kb(key))
 
     @dp.callback_query(F.data.startswith("dir:"))
     async def choose_direction(call: CallbackQuery, state: FSMContext):
