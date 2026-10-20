@@ -542,6 +542,8 @@ CHANNEL_BUTTONS = [
     ("board", "🏂 Сноуборды"),
     ("surf", "🏄 СноуСёрф"),
     ("fire", "🔥 Костровые системы"),
+    ("tj", "🇯🇵 TJ Brand"),
+    ("history", "📖 История"),
     ("caviar", "🐟 Красная икра и деликатесы"),
 ]
 
@@ -908,7 +910,7 @@ def parse_start(payload: str):
     payload = (payload or "").strip()
     if "_" in payload:
         src, d = payload.rsplit("_", 1)
-        if d in DIRECTIONS:
+        if d in DIRECTIONS or d in SECTIONS:
             return src, d
     return payload, None
 
@@ -1299,7 +1301,7 @@ def build_dispatcher() -> Dispatcher:
         base = f"https://t.me/{me.username}?start=kanal_"
         kb = InlineKeyboardBuilder()
         for key, label in CHANNEL_BUTTONS:
-            if key in DIRECTIONS:
+            if key in SECTIONS or key in DIRECTIONS:
                 kb.button(text=label, url=base + key)
         kb.button(text=HUMAN_BUTTON, url=PERSONAL_URL)
         kb.adjust(1)
