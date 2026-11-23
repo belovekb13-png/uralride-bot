@@ -93,6 +93,14 @@ WELCOME = (
     "А если есть вопрос ко мне, жми «Связаться с Дмитрием»."
 )
 
+SKY_WELCOME = (
+    "Здорова! Я помощник Дмитрия из <b>Ural Ride</b>.\n\n"
+    "В закрытом клубе <b>Sky Builders 1.0</b> ты получишь полный путь изготовления "
+    "сноуборда или лыж с нуля, рабочий гайд по Курум 162, материалы, услуги Ural Ride "
+    "и поддержку на каждом этапе.\n\n"
+    "Перед оплатой ознакомься с основной целью клуба."
+)
+
 FIRE_PRICES = {"Таганай 32 см": 5500, "Конжак 40 см": 7500}  # сталь Ст3
 FIRE_STAINLESS_EXTRA = 2000  # доплата за нержавеющую сталь
 BOARD_PRICE = 65000  # сноуборд «Свобода»
@@ -728,11 +736,11 @@ if BOT_MODE != "sky":
 # --- Аквабанк ----------------------------------------------------------
 SECTIONS_AQUA = {
     "rules": {
-        "title": "📌 Начало и правила клуба",
+        "title": "🎯 Основная цель клуба",
         "text": (
-            "Обязательно начни с правил клуба. Здесь мы уважаем друг друга, "
-            "делимся опытом и развиваем производство сноубордов и лыж вместе.\n\n"
-            "Открыть PDF с правилами можно по кнопке ниже."
+            "Здесь описаны цель Sky Builders 1.0, принципы клуба и правила общения. "
+            "Мы делимся опытом, тестируем решения и вместе развиваем производство сноубордов и лыж.\n\n"
+            "Ознакомься с документом перед вступлением."
         ),
         "url": RULES_URL,
     },
@@ -918,8 +926,7 @@ def channel_chat() -> str:
 def main_menu():
     kb = InlineKeyboardBuilder()
     if BOT_MODE == "sky":
-        for key, sec in SECTIONS.items():
-            kb.button(text=sec["title"], callback_data=f"sec:{key}")
+        kb.button(text="🎯 Основная цель клуба", callback_data="sec:rules")
         if PAYMENT_URL:
             kb.button(text="💳 Получить доступ за 8 000 ₽", url=PAYMENT_URL)
         kb.button(text=HUMAN_BUTTON, callback_data="human")
@@ -1283,7 +1290,7 @@ def build_dispatcher() -> Dispatcher:
         if direction and direction in SECTIONS and BOT_MODE != "sky":
             await show_section(message, direction)
         else:
-            await message.answer(WELCOME, reply_markup=main_menu())
+            await message.answer(SKY_WELCOME if BOT_MODE == "sky" else WELCOME, reply_markup=main_menu())
 
     @dp.message(Command("id"))
     async def show_ids(message: Message):
@@ -1383,7 +1390,7 @@ def build_dispatcher() -> Dispatcher:
         except Exception:
             logging.exception("Не удалось сохранить источник заявки на вступление")
         try:
-            await bot.send_message(request.user_chat_id, WELCOME, reply_markup=main_menu())
+            await bot.send_message(request.user_chat_id, SKY_WELCOME if BOT_MODE == "sky" else WELCOME, reply_markup=main_menu())
         except Exception:
             logging.exception("Не удалось написать новому участнику")
         if os.getenv("AUTO_APPROVE_JOIN", "1") != "0":
@@ -1398,7 +1405,7 @@ def build_dispatcher() -> Dispatcher:
         data = await state.get_data()
         await state.clear()
         await state.update_data(source=data.get("source", ""))
-        await call.message.answer(WELCOME, reply_markup=main_menu())
+        await call.message.answer(SKY_WELCOME if BOT_MODE == "sky" else WELCOME, reply_markup=main_menu())
 
     @dp.callback_query(F.data.startswith("sec:"))
     async def open_section(call: CallbackQuery, state: FSMContext):
