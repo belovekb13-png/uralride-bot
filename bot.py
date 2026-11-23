@@ -1271,12 +1271,20 @@ def build_dispatcher() -> Dispatcher:
                 name="Sky Builders 1.0",
                 member_limit=1,
             )
-            await bot.send_message(
-                target_id,
-                "Оплата подтверждена. Вот твоя персональная ссылка в Sky Builders 1.0:\n"
-                + invite.invite_link,
+            links = (
+                "Оплата подтверждена. Добро пожаловать в Sky Builders 1.0!\n\n"
+                "1. Вступи в закрытую группу по ссылке:\n" + invite.invite_link
+                + "\n\n"
+                "2. После входа открой закреплённое сообщение. В нём собраны правила, "
+                "основной гайд, каталог материалов и услуги UralRide.\n\n"
+                "Полезные ссылки:\n"
+                "Правила: " + RULES_URL + "\n"
+                "Основной гайд: " + GUIDE_URL + "\n"
+                "Каталог: " + CATALOG_URL + "\n"
+                "Работы участников: " + WORKS_URL
             )
-            await message.answer("Одноразовая ссылка отправлена.")
+            await bot.send_message(target_id, links, disable_web_page_preview=True)
+            await message.answer("Ссылка и материалы отправлены участнику.")
         except Exception as error:
             logging.exception("Не удалось выдать доступ")
             await message.answer(f"Не удалось выдать доступ: {error}")
