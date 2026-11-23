@@ -60,6 +60,28 @@ GUIDE_URL = os.getenv("GUIDE_URL", "")
 CATALOG_URL = os.getenv("CATALOG_URL", "")
 WORKS_URL = os.getenv("WORKS_URL", "")
 
+# Участники, которым Дмитрий подтвердил оплату. Файл сохраняется в /app/data.
+PAID_USERS_FILE = Path(os.getenv("PAID_USERS_FILE", str(Path(os.getenv("DATA_DIR", "/app/data")) / "paid_users.json")))
+
+def _load_paid_users() -> set[int]:
+    try:
+        data = json.loads(PAID_USERS_FILE.read_text(encoding="utf-8"))
+        return {int(value) for value in data}
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return set()
+
+
+def _save_paid_users() -> None:
+    try:
+        PAID_USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        PAID_USERS_FILE.write_text(json.dumps(sorted(PAID_USERS), ensure_ascii=False), encoding="utf-8")
+    except OSError:
+        logging.exception("Не удалось сохранить список оплативших участников")
+
+
+PAID_USERS = _load_paid_users()
+SKY_PAID_SECTIONS = {"guide", "catalog"}
+
 # ======================================================================
 # НАСТРОЙКИ: тексты, цены, вопросы
 # ======================================================================
@@ -910,11 +932,13 @@ def main_menu():
     kb.adjust(1)
     return kb.as_markup()
 
-def section_kb(key: str):
+def section_kb(key: str, unlocked: bool = false):
     sec = SECTIONS[key]
     kb = InlineKeyboardBuilder()
-    if BOT_MODE == "sky" and sec.get("url"):
+    if BOT_MODE == "sky" and sec.get("url") and (key not in SKY_PAID_SECTIONS or unlocked):
         kb.button(text="🔗 Открыть материал", url=sec["url"])
+    elif BOT_MODE == "sky" and key in SKY_PAID_SECTIONS and PAYMENT_URL:
+        kb.button(text="💳 Получить доступ за 8 000 ₽", url=PAYMENT_URL)
     if "items" in sec:
         for i, it in enumerate(sec["items"]):
             kb.button(text=it["title"], callback_data=f"itm:{key}:{i}")
@@ -987,12 +1011,20 @@ async def reset_keep_source(state: FSMContext):
 
 async def show_section(message: Message, key: str):
     sec = SECTIONS[key]
+    unlocked = BOT_MODE != "sky" or key not in SKY_PAID_SECTIONS or message.from_user.id == ADMIN_ID or message.from_user.id in PAID_USERS
     if "items" in sec:
-        await message.answer(sec["intro"], reply_markup=section_kb(key))
+        await message.answer(sec["intro"], reply_markup=section_kb(key, unlocked))
         return
-    kb = section_kb(key)
+    kb = section_kb(key, unlocked)
+    if BOT_MODE == "sky" and key in SKY_PAID_SECTIONS and not unlocked:
+        await message.answer(
+            "Этот раздел входит в доступ к Sky Builders 1.0.\n\n"
+            "После оплаты Дмитрий подтвердит доступ и пришлёт приглашение в закрытый клуб.",
+            reply_markup=kb,
+        )
+        return
     if BOT_MODE == "sky" and sec.get("url"):
-        await message.answer(sec["text"], reply_markup=section_kb(key))
+        await message.answer(sec["text"], reply_markup=kb)
         return
     pdf = MATERIALS_DIR / sec["pdf"] if sec.get("pdf") else None
     if pdf and pdf.exists():
@@ -1278,6 +1310,8 @@ def build_dispatcher() -> Dispatcher:
                 name="Sky Builders 1.0",
                 member_limit=1,
             )
+            PAID_USERS.add(target_id)
+            _save_paid_users()
             links = (
                 "Оплата подтверждена. Добро пожаловать в Sky Builders 1.0!\n\n"
                 "1. Вступи в закрытую группу по ссылке:\n" + invite.invite_link
