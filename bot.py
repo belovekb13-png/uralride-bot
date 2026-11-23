@@ -44,10 +44,10 @@ except ImportError:  # .env не обязателен, можно задать �
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0") or 0)
-# BOT_MODE=ural (по умолчанию) или BOT_MODE=aquabank: один код, два разных бота
+# BOT_MODE=ural (по умолчанию) или BOT_MODE=sky: один код, два разных бота
 BOT_MODE = os.getenv("BOT_MODE", "ural").strip().lower()
 CHANNEL_URL = os.getenv(
-    "CHANNEL_URL", "https://t.me/aquabank2" if BOT_MODE == "aquabank" else "https://t.me/uralride"
+    "CHANNEL_URL", "https://t.me/sky2" if BOT_MODE == "sky" else "https://t.me/uralride"
 )
 LEADS_FILE = Path(os.getenv("LEADS_FILE", "leads.csv"))
 # Запись заявок в Google-таблицу через веб-приложение Apps Script (необязательно).
@@ -557,7 +557,7 @@ BOT_LABEL = "Урал Райд"
 HUMAN_BUTTON = "💬 Связаться с Дмитрием"
 PERSONAL_URL = os.getenv("PERSONAL_URL", "https://t.me/belovekb13")
 
-if BOT_MODE == "aquabank":
+if BOT_MODE == "sky":
     BOT_LABEL = "Sky Builders 1.0"
     HUMAN_BUTTON = "💬 Написать Дмитрию"
     DIRECTIONS = {}
@@ -655,7 +655,7 @@ SECTIONS_URAL = {
     },
 }
 
-if BOT_MODE != "aquabank":
+if BOT_MODE != "sky":
     DIRECTIONS["board"] = {
         "title": "🏂 Сноуборды",
         "intro": "✍️ <b>Заявка на сноуборд</b>\nОдин вопрос про тебя и твой контакт, и Дмитрий свяжется лично.",
@@ -742,7 +742,7 @@ SECTIONS_AQUA = {
     },
 }
 
-SECTIONS = SECTIONS_AQUA if BOT_MODE == "aquabank" else SECTIONS_URAL
+SECTIONS = SECTIONS_AQUA if BOT_MODE == "sky" else SECTIONS_URAL
 
 
 HUMAN_MODE: set[int] = set()
@@ -895,7 +895,7 @@ def channel_chat() -> str:
 
 def main_menu():
     kb = InlineKeyboardBuilder()
-    if BOT_MODE == "aquabank":
+    if BOT_MODE == "sky":
         for key, sec in SECTIONS.items():
             kb.button(text=sec["title"], callback_data=f"sec:{key}")
         if PAYMENT_URL:
@@ -913,7 +913,7 @@ def main_menu():
 def section_kb(key: str):
     sec = SECTIONS[key]
     kb = InlineKeyboardBuilder()
-    if BOT_MODE == "aquabank" and sec.get("url"):
+    if BOT_MODE == "sky" and sec.get("url"):
         kb.button(text="🔗 Открыть материал", url=sec["url"])
     if "items" in sec:
         for i, it in enumerate(sec["items"]):
@@ -927,7 +927,7 @@ def section_kb(key: str):
 
 def item_kb(key: str):
     kb = InlineKeyboardBuilder()
-    back = "menu" if BOT_MODE == "aquabank" else f"sec:{key}"
+    back = "menu" if BOT_MODE == "sky" else f"sec:{key}"
     kb.button(text="◀️ Назад", callback_data=back)
     kb.button(text=HUMAN_BUTTON, callback_data="human")
     kb.adjust(2)
@@ -991,7 +991,7 @@ async def show_section(message: Message, key: str):
         await message.answer(sec["intro"], reply_markup=section_kb(key))
         return
     kb = section_kb(key)
-    if BOT_MODE == "aquabank" and sec.get("url"):
+    if BOT_MODE == "sky" and sec.get("url"):
         await message.answer(sec["text"], reply_markup=section_kb(key))
         return
     pdf = MATERIALS_DIR / sec["pdf"] if sec.get("pdf") else None
@@ -1229,7 +1229,7 @@ async def begin_direction(message: Message, state: FSMContext, user_id: int, dir
     HUMAN_MODE.discard(user_id)
     await state.update_data(direction=direction, idx=0, answers={})
     await state.set_state(Flow.answering)
-    if BOT_MODE == "aquabank":
+    if BOT_MODE == "sky":
         info_kb = InlineKeyboardBuilder()
         info_kb.button(text="ℹ️ Подробнее о товаре", callback_data=f"info:{direction}")
         await message.answer(DIRECTIONS[direction]["intro"], reply_markup=info_kb.as_markup())
@@ -1248,7 +1248,7 @@ def build_dispatcher() -> Dispatcher:
         HUMAN_MODE.discard(message.from_user.id)
         await state.clear()
         await state.update_data(source=source)
-        if direction and direction in SECTIONS and BOT_MODE != "aquabank":
+        if direction and direction in SECTIONS and BOT_MODE != "sky":
             await show_section(message, direction)
         else:
             await message.answer(WELCOME, reply_markup=main_menu())
