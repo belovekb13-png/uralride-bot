@@ -53,6 +53,12 @@ LEADS_FILE = Path(os.getenv("LEADS_FILE", "leads.csv"))
 # Запись заявок в Google-таблицу через веб-приложение Apps Script (необязательно).
 SHEETS_WEBHOOK_URL = os.getenv("SHEETS_WEBHOOK_URL", "")
 SHEETS_WEBHOOK_SECRET = os.getenv("SHEETS_WEBHOOK_SECRET", "")
+PAYMENT_URL = os.getenv("PAYMENT_URL", "")
+CLUB_CHAT_ID = os.getenv("CLUB_CHAT_ID", "")
+RULES_URL = os.getenv("RULES_URL", "")
+GUIDE_URL = os.getenv("GUIDE_URL", "")
+CATALOG_URL = os.getenv("CATALOG_URL", "")
+WORKS_URL = os.getenv("WORKS_URL", "")
 
 # ======================================================================
 # НАСТРОЙКИ: тексты, цены, вопросы
@@ -552,33 +558,26 @@ HUMAN_BUTTON = "💬 Связаться с Дмитрием"
 PERSONAL_URL = os.getenv("PERSONAL_URL", "https://t.me/belovekb13")
 
 if BOT_MODE == "aquabank":
-    BOT_LABEL = "Аквабанк"
-    HUMAN_BUTTON = "💬 Связаться с Дмитрием"
-    DIRECTIONS = {"caviar": DIRECTIONS["caviar"]}
+    BOT_LABEL = "Sky Builders 1.0"
+    HUMAN_BUTTON = "💬 Написать Дмитрию"
+    DIRECTIONS = {}
     WELCOME = (
-        "Здарова! 🤙\n"
-        "Это <b>Аквабанк</b>: красная икра с Сахалина и дальневосточные деликатесы.\n\n"
-        "Выбирай раздел, и мой помощник ответит тебе на все вопросы. "
-        "А если есть вопрос ко мне, жми «Связаться с Дмитрием»."
+        "Здорова! Я помощник Дмитрия из UralRide.\n\n"
+        "Это закрытый клуб Sky Builders 1.0. Здесь мы вместе разбираем, "
+        "как создавать сноуборды и лыжи с нуля — дома, в гараже или в мастерской.\n\n"
+        "Сначала ознакомься с правилами, затем открой основной гайд и выбери свой путь."
     )
-    STORY = (
-        "📖 <b>История Аквабанка</b>\n\n"
-        "Всё началось, когда я работал в IT. Мой друг-волейболист временно переехал во Владивосток "
-        "и присылал мне фото и видео с рыночных прилавков: деликатесы по очень интересным ценам. "
-        "Мы созванивались очень рано или очень поздно из-за разницы во времени, а он периодически "
-        "отправлял мне настоящие вкусности: кукумарию, морских ежей, красную икру, крабов, гребешки.\n\n"
-        "Я влюбился в эти продукты и показал знакомым, что цены могут быть доступнее магазинных, "
-        "а товар свежее. Был период, когда у нас был свой магазин, сейчас мы полностью онлайн. "
-        "Икра приходит с Сахалина напрямую с рыбного завода.\n\n"
-        "<b>Аквабанк за качество отвечает!</b> Это наш девиз с Игорем: мы дружим больше 20 лет, "
-        "и все, кто нас знает, это подтвердят."
-    )
+    STORY = WELCOME
     CHANNEL_POST = (
-        "Здарова! 🤙 Это <b>Аквабанк</b>.\n\n"
-        "Красная икра с Сахалина и деликатесы под заказ. Нажми на кнопку: бот ответит на все вопросы, "
-        "посчитает цену и оформит предзаказ. А если вопрос ко мне, жми «Связаться с Дмитрием»."
+        "Здорова! 🤙 Это UralRide.\n\n"
+        "Мы открыли набор в закрытый клуб Sky Builders 1.0. "
+        "Внутри — практический путь от идеи и материалов до готового сноуборда или лыж."
     )
-
+    CHANNEL_BUTTONS = [
+        ("rules", "📌 Начало и правила"),
+        ("guide", "📘 Основной гайд"),
+        ("catalog", "🧰 Материалы и услуги"),
+    ]
 else:
     DIRECTIONS = {k: v for k, v in DIRECTIONS.items() if k != "caviar"}
 
@@ -706,69 +705,40 @@ if BOT_MODE != "aquabank":
 
 # --- Аквабанк ----------------------------------------------------------
 SECTIONS_AQUA = {
-    "caviar": {
-        "title": "🐟 Красная икра",
-        "intro": "",
-        "lead": "caviar",
-        "lead_label": "✍️ Оформить предзаказ",
-        "items": [
-            {
-                "title": "💰 Почему так дорого?",
-                "text": (
-                    "💰 <b>Почему так дорого?</b>\n\n"
-                    "Потому что мы знаем про эту икру всё:\n"
-                    "• она идет с завода на Сахалине, с одного и того же. Мы работаем с ним уже "
-                    "6 лет (в прошлом сезоне был юбилейный, пятый);\n"
-                    "• на икру есть сертификаты, мы точно знаем, откуда она приехала;\n"
-                    "• она приезжает к нам охлажденной;\n"
-                    "• мы работаем по предзаказу: цена фиксируется до даты, и ты знаешь, что получишь.\n\n"
-                    "И еще: красная икра за все эти годы только дорожала. Актуальные цены в разделе "
-                    "«Кета и горбуша»."
-                ),
-                "files": ["certificates.jpg"],
-            },
-            {
-                "title": "🔎 А можно найти дешевле?",
-                "text": (
-                    "🔎 <b>А можно найти дешевле?</b>\n\n"
-                    "Можно, дешевле икра бывает. Мы не будем говорить, что у других плохо. Просто "
-                    "сравнивай по четырем вещам:\n"
-                    "1. Откуда она: завод, производитель, что написано на банке.\n"
-                    "2. Есть ли документы и сертификаты.\n"
-                    "3. В каком виде приехала: охлажденная или после заморозки.\n"
-                    "4. Когда произведена и как хранилась по дороге.\n\n"
-                    "Если на всё это есть честный ответ и цена ниже, бери. Если ответа нет, "
-                    "экономия получается именно за счет этого. У нас на каждый пункт ответ есть, "
-                    "могу показать сертификаты."
-                ),
-                "files": [],
-            },
-            {
-                "title": "🐟 Кета и горбуша: что выбрать",
-                "text": (
-                    "🐟 <b>Кета и горбуша</b>\n\n"
-                    "<b>Кета:</b> икринка крупнее, сочная, более нежный вкус.\n"
-                    "<b>Горбуша:</b> икринка мельче, ярко-красная, вкус насыщеннее, с легкой горчинкой.\n\n"
-                    "Обе с Сахалина, с одного завода. Выбирай по вкусу, а если сомневаешься, можно "
-                    "взять по небольшой упаковке и сравнить.\n\n"
-                    + _caviar_price_line()
-                ),
-                "files": ["guide_caviar.pdf", "photo_caviar_1.jpg", "photo_caviar_2.jpg", "photo_caviar_3.jpg"],
-            },
-            {
-                "title": "📦 Как проходит предзаказ",
-                "text": (
-                    "📦 <b>Как проходит предзаказ</b>\n\n"
-                    "Мы набираем заказы примерно две недели на куб икры (12,5 кг). Когда набирается "
-                    "достаточно заказов, открываем свежий куб и в тот же или на следующий день "
-                    "развозим заказчикам. Есть самовывоз.\n\n"
-                    "Упаковка вакуумная и герметичная, в холодильнике хранится до месяца. "
-                    "Самовывоз и доставка только по Екатеринбургу.\n\n"
-                    "Чтобы оформить предзаказ, нажми кнопку ниже."
-                ),
-                "files": [],
-            },
-        ],
+    "rules": {
+        "title": "📌 Начало и правила клуба",
+        "text": (
+            "Обязательно начни с правил клуба. Здесь мы уважаем друг друга, "
+            "делимся опытом и развиваем производство сноубордов и лыж вместе.\n\n"
+            "Открыть PDF с правилами можно по кнопке ниже."
+        ),
+        "url": RULES_URL,
+    },
+    "guide": {
+        "title": "📘 Учебные материалы",
+        "text": (
+            "Основной материал Sky Builders 1.0 — практический путь к своей "
+            "сноубордической доске. В гайде разобраны задача, геометрия, материалы, "
+            "сердечник, ЧПУ, сэндвич, вакуум, обработка и проверка.\n\n"
+            "Открыть PDF-гайд можно по кнопке ниже."
+        ),
+        "url": GUIDE_URL,
+    },
+    "works": {
+        "title": "🏂 Работы участников",
+        "text": (
+            "Здесь будут появляться готовые доски и лыжи участников, фотографии "
+            "производства, отзывы и результаты тестирования."
+        ),
+        "url": WORKS_URL,
+    },
+    "catalog": {
+        "title": "🧰 Материалы и услуги UralRide",
+        "text": (
+            "В каталоге собраны материалы для участников, услуги UralRide, "
+            "сердечники, ЧПУ-раскрой, разработка шейпа, комплекты и матрицы."
+        ),
+        "url": CATALOG_URL,
     },
 }
 
@@ -926,25 +896,26 @@ def channel_chat() -> str:
 def main_menu():
     kb = InlineKeyboardBuilder()
     if BOT_MODE == "aquabank":
-        sec = SECTIONS["caviar"]
-        for i, it in enumerate(sec["items"]):
-            kb.button(text=it["title"], callback_data=f"itm:caviar:{i}")
-        kb.button(text=sec["lead_label"], callback_data="dir:caviar")
+        for key, sec in SECTIONS.items():
+            kb.button(text=sec["title"], callback_data=f"sec:{key}")
+        if PAYMENT_URL:
+            kb.button(text="💳 Получить доступ за 8 000 ₽", url=PAYMENT_URL)
+        kb.button(text=HUMAN_BUTTON, callback_data="human")
+        kb.button(text="📣 Канал UralRide", url=CHANNEL_URL)
     else:
         for key, sec in SECTIONS.items():
             kb.button(text=sec["title"], callback_data=f"sec:{key}")
-    if BOT_MODE == "aquabank":
-        kb.button(text="📖 Наша история", callback_data="story")
-    kb.button(text=HUMAN_BUTTON, callback_data="human")
-    kb.button(text="📣 Наш канал", url=CHANNEL_URL)
+        kb.button(text=HUMAN_BUTTON, callback_data="human")
+        kb.button(text="📣 Наш канал", url=CHANNEL_URL)
     kb.adjust(1)
     return kb.as_markup()
-
 
 def section_kb(key: str):
     sec = SECTIONS[key]
     kb = InlineKeyboardBuilder()
-    if "items" in sec:  # Аквабанк: подменю с материалами
+    if BOT_MODE == "aquabank" and sec.get("url"):
+        kb.button(text="🔗 Открыть материал", url=sec["url"])
+    if "items" in sec:
         for i, it in enumerate(sec["items"]):
             kb.button(text=it["title"], callback_data=f"itm:{key}:{i}")
     if sec.get("lead"):
@@ -953,7 +924,6 @@ def section_kb(key: str):
     kb.button(text="◀️ Назад" if "items" not in sec else "↩️ В начало", callback_data="menu")
     kb.adjust(1)
     return kb.as_markup()
-
 
 def item_kb(key: str):
     kb = InlineKeyboardBuilder()
@@ -1021,6 +991,9 @@ async def show_section(message: Message, key: str):
         await message.answer(sec["intro"], reply_markup=section_kb(key))
         return
     kb = section_kb(key)
+    if BOT_MODE == "aquabank" and sec.get("url"):
+        await message.answer(sec["text"], reply_markup=section_kb(key))
+        return
     pdf = MATERIALS_DIR / sec["pdf"] if sec.get("pdf") else None
     if pdf and pdf.exists():
         try:
@@ -1279,6 +1252,34 @@ def build_dispatcher() -> Dispatcher:
             await show_section(message, direction)
         else:
             await message.answer(WELCOME, reply_markup=main_menu())
+
+    @dp.message(Command("grant"))
+    async def grant_access(message: Message, bot: Bot):
+        if message.from_user.id != ADMIN_ID:
+            return
+        if not CLUB_CHAT_ID:
+            await message.answer("Не задан CLUB_CHAT_ID.")
+            return
+        parts = (message.text or "").split(maxsplit=1)
+        if len(parts) != 2 or not parts[1].isdigit():
+            await message.answer("Формат: /grant TELEGRAM_ID_покупателя")
+            return
+        target_id = int(parts[1])
+        try:
+            invite = await bot.create_chat_invite_link(
+                chat_id=CLUB_CHAT_ID,
+                name="Sky Builders 1.0",
+                member_limit=1,
+            )
+            await bot.send_message(
+                target_id,
+                "Оплата подтверждена. Вот твоя персональная ссылка в Sky Builders 1.0:\n"
+                + invite.invite_link,
+            )
+            await message.answer("Одноразовая ссылка отправлена.")
+        except Exception as error:
+            logging.exception("Не удалось выдать доступ")
+            await message.answer(f"Не удалось выдать доступ: {error}")
 
     @dp.message(Command("leads"))
     async def leads(message: Message):
