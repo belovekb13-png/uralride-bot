@@ -1253,6 +1253,13 @@ def build_dispatcher() -> Dispatcher:
         else:
             await message.answer(WELCOME, reply_markup=main_menu())
 
+    @dp.message(Command("id"))
+    async def show_ids(message: Message):
+        await message.answer(
+            f"ID этого чата: {message.chat.id}\n"
+            f"Твой Telegram ID: {message.from_user.id}"
+        )
+
     @dp.message(Command("grant"))
     async def grant_access(message: Message, bot: Bot):
         if message.from_user.id != ADMIN_ID:
