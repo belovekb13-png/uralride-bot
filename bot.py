@@ -939,7 +939,7 @@ def main_menu():
     kb.adjust(1)
     return kb.as_markup()
 
-def section_kb(key: str, unlocked: bool = false):
+def section_kb(key: str, unlocked: bool = False):
     sec = SECTIONS[key]
     kb = InlineKeyboardBuilder()
     if BOT_MODE == "sky" and sec.get("url") and (key not in SKY_PAID_SECTIONS or unlocked):
