@@ -1477,6 +1477,10 @@ def build_dispatcher() -> Dispatcher:
 
     @dp.message(F.text | F.photo | F.document | F.voice)
     async def fallback(message: Message, bot: Bot):
+        # В Sky Builders бот обслуживает оплату и доступ в личке.
+        # В закрытой группе он молчит, чтобы не мешать общению участников.
+        if BOT_MODE == "sky" and message.chat.type != "private":
+            return
         if message.from_user.id in HUMAN_MODE and ADMIN_ID:
             await notify_admin(bot, f"✉️ Сообщение от {user_label(message.from_user)}:")
             try:
